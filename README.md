@@ -1,2 +1,2 @@
 # UM-OS
-This is an operating system for the raspberry pi 3 B+
+This is an operating system for the Raspberry Pi 3 B+
