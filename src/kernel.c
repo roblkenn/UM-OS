@@ -1,11 +1,17 @@
 #include "MiniUart.h"
+#include "utils.h"
 
 void kernelMain(void) {
 	uartInit();
 
-	uartSendString("Hello, Kernel!\r\n");
+    uartSendString("Current Exception level: ");
+    int el = getEL();
+    uartSend('0'+el);
+    uartSendString("\r\n");
 
-	while (1) {
-		uartSend(uartRecv());
-	}
+    uartSendString("Managed to avoid drowning!\r\n");
+
+    while (1) {
+        uartSend(uartRecv());
+    }
 }
