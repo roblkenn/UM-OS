@@ -25,22 +25,28 @@ struct Socket {
 };
 ```
 
-###Client Socket Interface
-```// Create a socket set up for shared memory at given portNumber
+### Client Socket Interface
+```
+// Create a socket set up for shared memory at given portNumber
 // Return socket's portNumber is 0 if failed? Or throw exception?
 // Pass portNumber = 0 to generate a random, unoccupied port
-Socket CreateSocket(int portNumber)```
-```// Connect to an existing socket (reverses which buffer is which, essentially)
+Socket CreateSocket(int portNumber)
+
+// Connect to an existing socket (reverses which buffer is which, essentially)
 // Same rules for portNumber except passing 0 shouldn't generate a random connection... that would be bad
-Socket ConnectSocket(int portNumber)```
-```// Close one end of a socket, when both creator and connector close, free up the Socket
+Socket ConnectSocket(int portNumber)
+
+// Close one end of a socket, when both creator and connector close, free up the Socket
 // Right now it returns bool, but it should probably be void and just throw an exception if something happens?
 // (Like the client trying to close a port they don't own)
-bool CloseSocket(int portNumber)```
-```// Writes to writeBuffer, blocks if full
-void SendByte(Socket socket, char data)```
-```// Reads from writeBuffer, blocks until data
-void ReadByte(Socket socket, char& data)```
+bool CloseSocket(int portNumber)
+
+// Writes to writeBuffer, blocks if full
+void SendByte(Socket socket, char data)
+
+// Reads from writeBuffer, blocks until data
+void ReadByte(Socket socket, char& data)
+```
 
 ###Why do we want this Socket abstraction?
 - We can start a program with sockets for "cin" and "cout" by default
