@@ -1,2 +1,7 @@
 kernel8.img
 [Bd]uild/
+build/MiniUart_c.o
+build/kernel8.elf
+build/*
+compile_commands.json
+tags
