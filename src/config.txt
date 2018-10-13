@@ -45,3 +45,4 @@ max_usb_current=1
 # Kernel configuration
 kernel_old=1
 disable_commandline_tags=1
+enable_uart=1
