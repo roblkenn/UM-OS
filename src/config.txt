@@ -27,7 +27,7 @@ hdmi_cvt=800 480 60 6 0 0 0
 hdmi_drive=1
 
 max_usb_current=1
-    
+	
 # uncomment to force a HDMI mode rather than DVI. This can make audio work in
 # DMT (computer monitor) modes
 #hdmi_drive=2

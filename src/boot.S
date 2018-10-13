@@ -4,19 +4,19 @@
 
 .globl _start
 _start:
-    mrs     x0, mpidr_el1
-    and     x0, x0,#0xFF    // check processor id
-    cbz     x0, master      // hang for all non-primary CPU
-    b       procHang
+	mrs     x0, mpidr_el1
+	and     x0, x0,#0xFF    // check processor id
+	cbz     x0, master      // hang for all non-primary CPU
+	b       procHang
 
 procHang:
-    b       procHang
+	b       procHang
 
 master:
-    adr     x0, bss_begin
-    adr     x1, bss_end
-    sub     x1, x1, x0
-    bl      memzero
+	adr     x0, bss_begin
+	adr     x1, bss_end
+	sub     x1, x1, x0
+	bl      memzero
 
-    mov     sp, #LOW_MEMORY
-    bl      kernelMain
+	mov     sp, #LOW_MEMORY
+	bl      kernelMain

@@ -1,11 +1,11 @@
 #include "MiniUart.h"
 
 void kernelMain(void) {
-    uartInit();
+	uartInit();
 
-    uartSendString("Hello, Kernel!\r\n");
+	uartSendString("Hello, Kernel!\r\n");
 
-    while (1) {
-        uartSend(uartRecv());
-    }
+	while (1) {
+		uartSend(uartRecv());
+	}
 }
