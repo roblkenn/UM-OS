@@ -1,4 +1,2 @@
 kernel8.img
-build/MiniUart_c.o
-build/kernel8.elf
-build/*
+[Bd]uild/
