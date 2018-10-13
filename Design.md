@@ -73,11 +73,7 @@ We need to be able to transition from user code to kernel code, typically this a
 # Process Control
 For each process we need a PCB similar to below
 ```C
-// Note I've called variables that I'm not sure how we want to implement as void
-// Essentially it needs to know it's own pid
-// It needs to know where in it's execution it was at (starts at 0x0, interrupt called at 0x8, needs to resume at 0x8)
-// It needs to know where it's stack/heap/instructions are in memory (if at all)
-// It needs to know where it's stack/heap/instructions are on disk (if not in memory)
+/* These are the registers we need to restore for a PCB */
 struct ContextRegisters {
 	unsigned long sp; //stack pointer: x18 technically
 	unsigned long x19;
@@ -109,6 +105,118 @@ struct PCB {
 									 //but it cannot give up execution entirely.
 	pid_t pid;						 //This just stores the process identifier, pid_t is a generic typename, can be defined later
 };
+
+struct PCB* currentPCB;
+struct PCB* processes[MAX_PROCESSES];
+int numProcesses = 1;
 ```
 
-Then the kernel will have a queue of PCBs. If none, we stall until one becomes available. If there are some, we want to pull of the first one, load it's instructions, stack, heap, etc. and continue execution. This occurs until the process either yields control back to the kernel (it finished or is waiting on some IPC), or an interrupt happens. Unless the process has completed, we want to update the PCB and place it at the end of the queue, then pop the next one and continue.
+As far as what `kernel_main` does, it should load up the invariants for task scheduling and then yield control.
+
+```C
+void kernel_main() {
+	//Note, this is just the code directly involved in process scheduling, kernel_main may also do other things
+
+	currentPCB = MAIN_PCB; //Const macro that initializes a PCB for kernel_main
+
+	while(1) {
+		Yield();
+	}
+}
+```
+
+`yield` may either try and follow the scheduling algorithm outlined in the tutorial's `_schedule` function, or it can be simple and just start by treating `processes` as a FIFO. Note that while a FIFO is simple to get up and running, it disregards any counter/priority we've coded. Either way it should follow the following pseudocode
+
+```C
+void Yield() {
+	// Increment currentPCB's unyieldableCount
+	struct PCB* nextPCB;
+	// Decide what process we yield to and store in nextProcess
+	SwitchProcessTo(nextPCB);
+	// Decrement currentPCB's unyieldableCount
+}
+
+void SwitchProcessTo(struct PCB* nextPCB){
+	if(nextPCB == currentPCB)
+		return;
+	struct PCB* prevPCB = currentPCB;
+	currentPCB = nextPCB;
+	SwitchContext(prevPCB, currentPCB);
+}
+```
+
+And for SwitchContext, we have to go to Assembly
+
+```Assembly
+.global SwitchContext
+SwitchContext:
+	mov		x10, #PCB_CONTEXT_REGISTERS_OFFSET	// The offset from the start of a PCB struct to it's Context Registers (0 right now)
+
+	add		x8, x0, x10							// Parameter 0 is prevPCB, so x8 now points to the ContextRegisters in prevPCB
+	mov		x18, sp								// Move the current stack pointer into a register that we are saving for return
+	stp		x18, x19, [x8] #16					// Store x18 and x19 at the start of ContextRegisters (sp and x19 respectively),
+												// Post increment x8 by 16 bytes afterward (now points to x20)
+	stp 	x20, x21, [x8] #16					// Likewise for the next few instructions
+	stp 	x22, x23, [x8] #16
+	stp 	x24, x25, [x8] #16
+	stp 	x26, x27, [x8] #16
+	stp 	x28, x29, [x8] #16					// Reminder that x29 is fp
+	str		x30, [x8]							// Store just x30 (pc)
+
+	add		x8, x1, x10							// Parameter 1 is currentPCB, so x8 now points to the ContextRegisters in currentPCB
+	ldp		x18, x19, [x8] #16					// Similar to above, but loading a pair now. (Reminder that x18 is sp)
+	ldp		x20, x21, [x8] #16
+	ldp		x22, x23, [x8] #16
+	ldp		x24, x25, [x8] #16
+	ldp		x26, x27, [x8] #16
+	ldp		x28, x29, [x8] #16					// Reminder that x29 is fp
+	ldr		x30, [x8]							// Load just x30 (pc)
+
+	mov		sp, x18								// Load the new stack pointer
+	ret
+```
+
+### Creating a Process
+So now we can switch between processes, but we only have the one. If a process wants to create another, it would call:
+
+```C
+int CreateProcess(void* function, void* arg) {
+	// Increment currentPCB's unyieldableCount (We don't want to yield in the middle of this)
+
+	pid_t newPid;
+	// Get an open pid and store it in newPid. Return 1 if none exist (maxing out our processes global container)
+	// Make sure you increment numProcesses too
+
+	struct PCB* newPCB = (struct PCB*) GetPage(); // This is a memory management function, look at tutorial for a nice dummy version
+	if(!newPCB)
+		return 1;
+	
+	newPCB->pid = newPid;
+	newPCB->priority = currentPCB->priority;
+	newPCB->counter = currentPCB->priority;
+	newPCB->unyieldableCount = 1;				// Disable yields until this process is called for the first time
+
+	newPCB->context.x19 = function;				// Store the function and args we want to call in arbitrary registers
+	newPCB->context.x20 = arg;
+
+	newPCB->context.pc = (unsigned long)StartProcess;	// Set the program counter (also our return instruction) to a function
+														// that will call our function with the given argument
+	newPCB->context.sp = (unsigned long)newPCB + THREAD_SIZE;	// Stacks grow down, set our sp to the very end of the virtual page
+
+	// Decrement currentPCB's unyieldableCount
+	return 0;
+}
+```
+
+Where StartProcess is an assembly function as follows:
+```Assembly
+.global StartProcess
+StartProcess:
+	// Call a function to decrement currentPCB's unyieldableCount
+	mov x0, x20		// Store the argument for our process as our first parameter
+	blr	x19			// And then call that function (stored in x19 right now)
+```
+
+### Side notes
+We need a way to physically create a new process. We have a way to create a PCB, but it never gets called. Right now our `kernel_main` is going to boot up, initialize everything, and then continue yielding to itself. If there were any other processes running, it would theoretically yield to them, but since we have no way to create new ones, it kinda just loops. In the tutorial it spins up it's own "Dummy" processes that just print dummy data over and over. We can test with this or we can try and write a VERY basic shell executable that we can run. Chances are we can even store this executable below `LOW_MEMORY` (First 4MB). 
+Essentially to test this system we need to either hard code some processes or find a way to have the user call them (calling executables out of the kernel)
