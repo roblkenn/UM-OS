@@ -50,3 +50,7 @@ void uartSendString(char* str) {
 		uartSend((char)str[i]);
 	}
 }
+
+void putc(void* p, char c){
+	uartSend(c);
+}
