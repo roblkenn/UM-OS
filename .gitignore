@@ -2,3 +2,4 @@ kernel8.img
 build/
 compile_commands.json
 tags
+.vscode/
